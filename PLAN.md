@@ -5,7 +5,7 @@ Part of the **Riddles** brand (5-app family). See brand strategy in `../PLAN.md`
 ## This App
 - **Category:** number / math pattern puzzles (closest to the proven Black Games reference).
 - **Repo:** https://github.com/DEVENDRAP7/Riddles-maths.git
-- **Package id (planned):** `com.riddles.maths` (confirm before build).
+- **Package id (FINAL, permanent):** `com.devendrap7.riddles.maths`
 - **Accent color:** blue. Glyph: numbers.
 - **Privacy policy URL:** TBD (separate per app).
 
