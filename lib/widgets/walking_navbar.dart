@@ -77,9 +77,9 @@ class _WalkingNavBarState extends State<WalkingNavBar>
                   : _boardCx(w, widget.index);
               final bob = math.sin(_run.value * math.pi * 2 * 2).abs() *
                   (transitioning ? 3 : 1.5);
-              // Face direction never changes — he always faces the same way,
-              // carrying the board on his head.
-              const facing = 1.0;
+              // Idle: faces the same way. Walking between boards: faces the
+              // direction he is travelling (so going back home he turns around).
+              final facing = transitioning ? ((_to >= _from) ? 1.0 : -1.0) : 1.0;
 
               return Stack(
                 clipBehavior: Clip.none,
@@ -123,7 +123,8 @@ class _WalkingNavBarState extends State<WalkingNavBar>
       final wob = math.sin(_run.value * math.pi * 2) * 1.5;
       return Positioned(
         left: humanX - plankW / 2,
-        top: headTopY - plankH + 2 + wob,
+        // Lifted a little above the head so his hands show in the gap.
+        top: headTopY - 12 - plankH + wob,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () => widget.onTap(i),
@@ -401,10 +402,19 @@ class _RoadRunnerPainter extends CustomPainter {
 
   // Arm raised overhead (side = -1 left, +1 right) to steady the head-board.
   void _armUp(Canvas canvas, Offset shoulder, int side, Paint p) {
-    final elbow = shoulder + Offset(side * 7.0, -10);
-    final hand = elbow + Offset(side * 3.0, -12); // hand up near the board
+    final elbow = shoulder + Offset(side * 9.0, -12);
+    final hand = elbow + Offset(side * 5.0, -16); // hand up into the gap
     canvas.drawLine(shoulder, elbow, p);
     canvas.drawLine(elbow, hand, p);
+    // Visible hand gripping under the board.
+    canvas.drawCircle(hand, 3, Paint()..color = AppColors.sunYellow);
+    canvas.drawCircle(
+        hand,
+        3,
+        Paint()
+          ..color = AppColors.accentDark
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5);
   }
 
   Offset _polar(double angle, double len) =>
