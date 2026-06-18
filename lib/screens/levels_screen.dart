@@ -34,7 +34,7 @@ class LevelsScreen extends ConsumerWidget {
                 data: (levels) {
                   final total = levels.length;
                   return GridView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 150),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 5,

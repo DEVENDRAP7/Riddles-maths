@@ -84,11 +84,17 @@ class _ShellScaffoldState extends State<_ShellScaffold>
             ),
           ),
           Positioned.fill(child: widget.child),
+          // Navbar merged into the scene (transparent, on the road).
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: WalkingNavBar(
+              index: index,
+              onTap: (i) => context.go(i == 0 ? '/home' : '/levels'),
+            ),
+          ),
         ],
-      ),
-      bottomNavigationBar: WalkingNavBar(
-        index: index,
-        onTap: (i) => context.go(i == 0 ? '/home' : '/levels'),
       ),
     );
   }
