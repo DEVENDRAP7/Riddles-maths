@@ -251,8 +251,10 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
   }
 
   Widget _helpButtons() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 14,
+      runSpacing: 12,
       children: [
         if (!_showHint)
           BouncyButton(
@@ -264,8 +266,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
             fontSize: 18,
             onTap: () => setState(() => _showHint = true),
           ),
-        if (_showHint && !_showSolution) ...[
-          const SizedBox(width: 14),
+        if (_showHint && !_showSolution)
           BouncyButton(
             label: 'SOLUTION',
             icon: Icons.visibility_rounded,
@@ -275,7 +276,6 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
             fontSize: 18,
             onTap: () => setState(() => _showSolution = true),
           ),
-        ],
       ],
     );
   }
@@ -299,8 +299,10 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
           Text('Answer: ${level.answer}',
               style: AppTheme.title(20, color: AppColors.ink)),
           const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 14,
+            runSpacing: 12,
             children: [
               BouncyButton(
                 label: 'LEVELS',
@@ -310,8 +312,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                 fontSize: 18,
                 onTap: () => context.go('/levels'),
               ),
-              if (hasNext) ...[
-                const SizedBox(width: 14),
+              if (hasNext)
                 BouncyButton(
                   label: 'NEXT',
                   icon: Icons.arrow_forward_rounded,
@@ -321,7 +322,6 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                   onTap: () => context.pushReplacement(
                       '/play/${level.level + 1}'),
                 ),
-              ],
             ],
           ),
         ],
