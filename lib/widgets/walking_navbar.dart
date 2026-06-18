@@ -355,9 +355,10 @@ class _RoadRunnerPainter extends CustomPainter {
       _arm(canvas, shoulder, swing * 1.2 + 0.2, limb);
     } else {
       // Standing tall, striding stance, one arm stretched out holding board.
-      // Back leg (planted) + front leg (stepped forward).
-      _legBent(canvas, hip, const Offset(-9, -12), const Offset(-15, 0), limb);
-      _legBent(canvas, hip, const Offset(9, -13), const Offset(15, 0), limb);
+      // Legs go DOWN from the hip (positive Y) to the feet on the road.
+      // Back leg (stepped back) + front leg (stepped forward).
+      _legBent(canvas, hip, const Offset(-7, 12), const Offset(-9, 12), limb);
+      _legBent(canvas, hip, const Offset(7, 12), const Offset(9, 12), limb);
       canvas.drawLine(hip, shoulder, bodyPaint);
       // Balance arm reaching back.
       canvas.drawLine(shoulder, shoulder + const Offset(-18, 4), limb);
