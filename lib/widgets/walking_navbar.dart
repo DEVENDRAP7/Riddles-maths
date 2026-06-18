@@ -122,7 +122,7 @@ class _WalkingNavBarState extends State<WalkingNavBar>
       // Held out front in the human's outstretched hand, pointing toward the
       // centre of the screen so it never runs off the edge.
       final face = i == 0 ? 1.0 : -1.0;
-      final handX = humanX + 46 * face; // matches arm reach in the painter
+      final handX = humanX + 45 * face; // matches arm reach in the painter
       final handY = roadY - bob - 62;
       final wob = math.sin(_run.value * math.pi * 2) * 1.5;
       // For face=1 the plank extends right (near end = left). For face=-1 it
@@ -322,9 +322,12 @@ class _RoadRunnerPainter extends CustomPainter {
 
   void _drawHuman(Canvas canvas, Offset feet) {
     final phase = run * math.pi * 2;
-    final swing = math.sin(phase) * (transitioning ? 0.45 : 0.0);
-    final lean = transitioning ? 0.18 * facing : 0.0;
-    const s = 1.35; // overall scale — bigger, clearer figure
+    // He is ALWAYS walking — even while carrying the board. Legs swing a bit
+    // wider while running between boards.
+    final amp = transitioning ? 0.55 : 0.42;
+    final swing = math.sin(phase) * amp;
+    final lean = transitioning ? 0.16 * facing : 0.04 * facing;
+    const s = 1.4; // overall scale — bigger, clearer figure
 
     canvas.save();
     canvas.translate(feet.dx, feet.dy - bob);
@@ -332,68 +335,79 @@ class _RoadRunnerPainter extends CustomPainter {
     canvas.scale(facing * s, s);
 
     final limb = Paint()
-      ..strokeWidth = 4
+      ..strokeWidth = 5
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke
       ..color = AppColors.accentDark;
-    final bodyPaint = Paint()
-      ..color = AppColors.accent
-      ..strokeWidth = 5.5
-      ..strokeCap = StrokeCap.round;
+    final shoe = Paint()..color = AppColors.ink;
 
-    const hip = Offset(0, -24);
+    const hip = Offset(0, -22);
     const shoulder = Offset(0, -44);
-    const head = Offset(0, -54);
+    const head = Offset(0, -55);
 
+    // --- Legs (always walking) ---
+    _leg(canvas, hip, swing, limb, shoe);
+    _leg(canvas, hip, -swing, limb, shoe);
+
+    // --- Body capsule ---
+    final bodyRect = RRect.fromLTRBR(
+        -5, shoulder.dy, 5, hip.dy + 2, const Radius.circular(5));
+    canvas.drawRRect(bodyRect, Paint()..color = AppColors.accent);
+
+    // --- Arms ---
     if (transitioning) {
-      // Running — striding legs, pumping arms, body leaning forward.
-      _leg(canvas, hip, swing, limb);
-      _leg(canvas, hip, -swing, limb);
-      canvas.drawLine(hip, shoulder, bodyPaint);
+      // Running — both arms pump.
       _arm(canvas, shoulder, -swing * 1.2 - 0.2, limb);
       _arm(canvas, shoulder, swing * 1.2 + 0.2, limb);
     } else {
-      // Standing tall, striding stance, one arm stretched out holding board.
-      // Legs go DOWN from the hip (positive Y) to the feet on the road.
-      // Back leg (stepped back) + front leg (stepped forward).
-      _legBent(canvas, hip, const Offset(-7, 12), const Offset(-9, 12), limb);
-      _legBent(canvas, hip, const Offset(7, 12), const Offset(9, 12), limb);
-      canvas.drawLine(hip, shoulder, bodyPaint);
-      // Balance arm reaching back.
-      canvas.drawLine(shoulder, shoulder + const Offset(-18, 4), limb);
-      // Holding arm — outstretched forward, hand where the plank sits.
-      const hand = Offset(34, -2 - 44); // ≈ shoulder height, reaching out
-      final elbow = Offset.lerp(shoulder, hand, 0.5)! + const Offset(2, -2);
+      // Free arm swings with the walk; holding arm is outstretched to the board.
+      _arm(canvas, shoulder, -swing, limb); // free arm
+      const hand = Offset(32, -44); // hand reaches out at shoulder height
+      final elbow = Offset.lerp(shoulder, hand, 0.5)! + const Offset(1, -3);
       canvas.drawLine(shoulder, elbow, limb);
       canvas.drawLine(elbow, hand, limb);
     }
 
-    // Head with a little neck.
-    canvas.drawLine(shoulder, head + const Offset(0, 6), bodyPaint);
-    canvas.drawCircle(head, 9, Paint()..color = AppColors.sunYellow);
+    // --- Neck + head with a little face ---
+    canvas.drawLine(shoulder, head + const Offset(0, 7), limb..strokeWidth = 5);
+    canvas.drawCircle(head, 10, Paint()..color = AppColors.sunYellow);
     canvas.drawCircle(
         head,
-        9,
+        10,
         Paint()
           ..color = AppColors.accentDark
           ..style = PaintingStyle.stroke
           ..strokeWidth = 3);
-    canvas.drawCircle(const Offset(4, -55), 1.6, Paint()..color = AppColors.ink);
+    // eyes + smile (faces forward, +x)
+    final face = Paint()..color = AppColors.ink;
+    canvas.drawCircle(head + const Offset(3, -2), 1.5, face);
+    canvas.drawCircle(head + const Offset(7, -2), 1.5, face);
+    final smile = Path()
+      ..moveTo(head.dx + 2, head.dy + 3)
+      ..quadraticBezierTo(head.dx + 5, head.dy + 6, head.dx + 8, head.dy + 3);
+    canvas.drawPath(
+        smile,
+        Paint()
+          ..color = AppColors.ink
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.6
+          ..strokeCap = StrokeCap.round);
 
     canvas.restore();
   }
 
-  void _leg(Canvas canvas, Offset hip, double angle, Paint p) {
-    final knee = hip + _polar(angle, 13);
-    final foot = knee + _polar(angle * 0.6, 13);
+  void _leg(Canvas canvas, Offset hip, double angle, Paint p, Paint shoe) {
+    // Angle measured from straight-down; cos keeps the leg pointing DOWN.
+    final knee = hip + _polar(angle, 12);
+    final foot = knee + _polar(angle * 0.5, 12);
     canvas.drawLine(hip, knee, p);
     canvas.drawLine(knee, foot, p);
-  }
-
-  void _legBent(Canvas canvas, Offset hip, Offset knee, Offset foot, Paint p) {
-    canvas.drawLine(hip, hip + knee, p);
-    canvas.drawLine(hip + knee, hip + knee + foot, p);
+    // little shoe
+    canvas.drawOval(
+        Rect.fromCenter(
+            center: foot + const Offset(2, 1), width: 10, height: 5),
+        shoe);
   }
 
   void _arm(Canvas canvas, Offset shoulder, double angle, Paint p) {
