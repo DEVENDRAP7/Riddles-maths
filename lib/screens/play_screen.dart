@@ -180,42 +180,104 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
     ).animate().scale(duration: 350.ms, curve: Curves.easeOutBack);
   }
 
+  // --- Input handling (custom keypad only — never the system keyboard) ---
+  void _append(String ch) {
+    if (_controller.text.length >= 9) return;
+    if (ch == '.' && _controller.text.contains('.')) return;
+    setState(() {
+      _controller.text += ch;
+      _wrong = false;
+    });
+  }
+
+  void _backspace() {
+    if (_controller.text.isEmpty) return;
+    setState(() {
+      _controller.text =
+          _controller.text.substring(0, _controller.text.length - 1);
+      _wrong = false;
+    });
+  }
+
   Widget _answerField(Level level) {
-    return Row(
+    final text = _controller.text;
+    return Column(
       children: [
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: AppColors.accent, width: 2.5),
-            ),
-            child: TextField(
-              controller: _controller,
-              textAlign: TextAlign.center,
-              style: AppTheme.title(24, color: AppColors.ink),
-              decoration: const InputDecoration(
-                hintText: 'Your answer',
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 16),
-              ),
-              onSubmitted: (_) => _check(level),
-              onChanged: (_) {
-                if (_wrong) setState(() => _wrong = false);
-              },
+        // Answer display (read-only — no system keyboard).
+        Container(
+          width: double.infinity,
+          height: 56,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.accent, width: 2.5),
+          ),
+          child: Text(
+            text.isEmpty ? 'Tap the numbers' : text,
+            style: AppTheme.title(
+              text.isEmpty ? 18 : 26,
+              color: text.isEmpty ? AppColors.locked : AppColors.ink,
             ),
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(height: 16),
+        // Number pad.
+        _padRow(['1', '2', '3']),
+        const SizedBox(height: 10),
+        _padRow(['4', '5', '6']),
+        const SizedBox(height: 10),
+        _padRow(['7', '8', '9']),
+        const SizedBox(height: 10),
+        _padRow(['.', '0', '<']),
+        const SizedBox(height: 16),
         BouncyButton(
-          label: 'GO',
+          label: 'CHECK',
+          icon: Icons.check_rounded,
           color: AppColors.grassGreen,
           baseColor: const Color(0xFF2E8B4E),
           height: 60,
-          fontSize: 20,
+          fontSize: 22,
           onTap: () => _check(level),
         ),
       ],
+    );
+  }
+
+  Widget _padRow(List<String> keys) {
+    return Row(
+      children: [
+        for (var i = 0; i < keys.length; i++) ...[
+          if (i > 0) const SizedBox(width: 10),
+          Expanded(child: _key(keys[i])),
+        ],
+      ],
+    );
+  }
+
+  Widget _key(String label) {
+    final isBack = label == '<';
+    return GestureDetector(
+      onTap: () => isBack ? _backspace() : _append(label),
+      child: Container(
+        height: 56,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isBack ? AppColors.coral : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.accent, width: 2.5),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.accentDark.withValues(alpha: 0.18),
+              offset: const Offset(0, 4),
+              blurRadius: 0,
+            ),
+          ],
+        ),
+        child: isBack
+            ? const Icon(Icons.backspace_rounded, color: Colors.white, size: 24)
+            : Text(label, style: AppTheme.title(26, color: AppColors.ink)),
+      ),
     );
   }
 
