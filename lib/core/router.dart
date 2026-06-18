@@ -4,7 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../screens/home_screen.dart';
 import '../screens/levels_screen.dart';
 import '../screens/play_screen.dart';
-import 'theme.dart';
+import '../widgets/scene_background.dart';
+import '../widgets/walking_navbar.dart';
 
 /// Two-tab app shell (Home + Levels) with the Play screen pushed on top.
 final appRouter = GoRouter(
@@ -35,39 +36,59 @@ final appRouter = GoRouter(
   ],
 );
 
-class _ShellScaffold extends StatelessWidget {
+class _ShellScaffold extends StatefulWidget {
   final Widget child;
   final String location;
   const _ShellScaffold({required this.child, required this.location});
 
   @override
+  State<_ShellScaffold> createState() => _ShellScaffoldState();
+}
+
+class _ShellScaffoldState extends State<_ShellScaffold>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pan = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1150),
+    value: _indexFor(widget.location).toDouble(),
+  );
+
+  int _indexFor(String loc) => loc.startsWith('/levels') ? 1 : 0;
+
+  @override
+  void didUpdateWidget(covariant _ShellScaffold old) {
+    super.didUpdateWidget(old);
+    final target = _indexFor(widget.location).toDouble();
+    if (_pan.value != target) {
+      _pan.animateTo(target, curve: Curves.easeInOutCubic);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pan.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final index = location.startsWith('/levels') ? 1 : 0;
+    final index = _indexFor(widget.location);
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: child,
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: AppColors.accent, width: 2)),
-        ),
-        child: NavigationBar(
-          backgroundColor: Colors.white,
-          indicatorColor: AppColors.accent.withValues(alpha: 0.18),
-          selectedIndex: index,
-          onDestinationSelected: (i) =>
-              context.go(i == 0 ? '/home' : '/levels'),
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.home_rounded),
-              label: 'Home',
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _pan,
+              builder: (context, _) => SceneBackground(pan: _pan.value),
             ),
-            NavigationDestination(
-              icon: Icon(Icons.grid_view_rounded),
-              label: 'Levels',
-            ),
-          ],
-        ),
+          ),
+          Positioned.fill(child: widget.child),
+        ],
+      ),
+      bottomNavigationBar: WalkingNavBar(
+        index: index,
+        onTap: (i) => context.go(i == 0 ? '/home' : '/levels'),
       ),
     );
   }

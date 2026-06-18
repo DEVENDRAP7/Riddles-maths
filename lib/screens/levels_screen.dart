@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 
 import '../core/theme.dart';
 import '../state/providers.dart';
-import '../widgets/cartoon_background.dart';
 
 /// Levels tab: a grid of all 100 levels.
 /// - solved  → green, tappable (replay)
@@ -19,8 +18,7 @@ class LevelsScreen extends ConsumerWidget {
     final levelsAsync = ref.watch(levelsProvider);
     final solved = ref.watch(solvedCountProvider);
 
-    return CartoonBackground(
-      child: SafeArea(
+    return SafeArea(
         child: Column(
           children: [
             Padding(
@@ -66,7 +64,6 @@ class LevelsScreen extends ConsumerWidget {
             ),
           ],
         ),
-      ),
     );
   }
 }

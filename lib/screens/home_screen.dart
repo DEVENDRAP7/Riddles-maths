@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import '../core/theme.dart';
 import '../state/providers.dart';
 import '../widgets/bouncy_button.dart';
-import '../widgets/cartoon_background.dart';
 
 /// Home tab: shows the player's current level and a big Play button that
 /// jumps straight into it.
@@ -18,8 +17,7 @@ class HomeScreen extends ConsumerWidget {
     final levelsAsync = ref.watch(levelsProvider);
     final solved = ref.watch(solvedCountProvider);
 
-    return CartoonBackground(
-      child: SafeArea(
+    return SafeArea(
         child: levelsAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(child: Text('Failed to load levels\n$e')),
@@ -75,7 +73,6 @@ class HomeScreen extends ConsumerWidget {
             );
           },
         ),
-      ),
     );
   }
 }
