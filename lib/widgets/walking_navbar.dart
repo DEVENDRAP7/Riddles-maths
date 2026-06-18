@@ -209,24 +209,9 @@ class _WalkingNavBarState extends State<WalkingNavBar>
               child: Container(
                   height: 1.5, color: const Color(0x556B4423)),
             ),
-            // Grip / handle on the near end (the hand side).
-            Positioned(
-              left: gripLeft ? 4 : null,
-              right: gripLeft ? null : 4,
-              top: hgt / 2 - 7,
-              child: Container(
-                width: 10,
-                height: 14,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF5A3617),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-            ),
             // Label.
             Padding(
-              padding: EdgeInsets.only(
-                  left: gripLeft ? 14 : 0, right: gripLeft ? 0 : 14),
+              padding: EdgeInsets.zero,
               child: Center(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
