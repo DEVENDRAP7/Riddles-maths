@@ -43,7 +43,11 @@ class _SceneBackgroundState extends State<SceneBackground>
             builder: (context, _) {
               return Transform.translate(
                 offset: Offset(-widget.pan * w, 0),
-                child: SizedBox(
+                child: OverflowBox(
+                  minWidth: 0,
+                  maxWidth: w * 2,
+                  alignment: Alignment.centerLeft,
+                  child: SizedBox(
                   width: w * 2,
                   height: c.maxHeight,
                   child: Row(
@@ -68,6 +72,7 @@ class _SceneBackgroundState extends State<SceneBackground>
                       ),
                     ],
                   ),
+                ),
                 ),
               );
             },
