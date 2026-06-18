@@ -71,17 +71,15 @@ class _WalkingNavBarState extends State<WalkingNavBar>
               final transitioning = _trans.isAnimating;
               final t = _trans.value;
               final p = transitioning ? Curves.easeInOut.transform(t) : 1.0;
-              final dir = (_to >= _from) ? 1.0 : -1.0;
 
               final humanX = transitioning
                   ? _lerp(_boardCx(w, _from), _boardCx(w, _to), p)
                   : _boardCx(w, widget.index);
               final bob = math.sin(_run.value * math.pi * 2 * 2).abs() *
                   (transitioning ? 3 : 1.5);
-              // Idle: face inward so the held board points to centre (stays
-              // on-screen). Running: face the direction of travel.
-              final facing =
-                  transitioning ? dir : (widget.index == 0 ? 1.0 : -1.0);
+              // Face direction never changes — he always faces the same way,
+              // carrying the board on his head.
+              const facing = 1.0;
 
               return Stack(
                 clipBehavior: Clip.none,
@@ -119,28 +117,17 @@ class _WalkingNavBarState extends State<WalkingNavBar>
     const postH = 42.0;
 
     if (carried) {
-      // Held out front in the human's outstretched hand, pointing toward the
-      // centre of the screen so it never runs off the edge.
-      final face = i == 0 ? 1.0 : -1.0;
-      final handX = humanX + 45 * face; // matches arm reach in the painter
-      final handY = roadY - bob - 62;
+      // Balanced flat on top of his head, centred over the body. The head top
+      // sits at roughly roadY - bob - 90 (head centre -77, radius ~14).
+      final headTopY = roadY - bob - 90;
       final wob = math.sin(_run.value * math.pi * 2) * 1.5;
-      // For face=1 the plank extends right (near end = left). For face=-1 it
-      // extends left (near end = right).
-      final left = face == 1 ? handX - 10 : handX + 10 - plankW;
       return Positioned(
-        left: left,
-        top: handY - plankH / 2 + wob,
+        left: humanX - plankW / 2,
+        top: headTopY - plankH + 2 + wob,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () => widget.onTap(i),
-          child: Transform.rotate(
-            alignment:
-                face == 1 ? Alignment.centerLeft : Alignment.centerRight,
-            angle: -0.14 * face,
-            child: _woodPlank(title, icon, plankW, plankH, true,
-                gripLeft: face == 1),
-          ),
+          child: _woodPlank(title, icon, plankW, plankH, true, gripLeft: true),
         ),
       );
     }
@@ -361,12 +348,9 @@ class _RoadRunnerPainter extends CustomPainter {
       _arm(canvas, shoulder, -swing * 1.2 - 0.2, limb);
       _arm(canvas, shoulder, swing * 1.2 + 0.2, limb);
     } else {
-      // Free arm swings with the walk; holding arm is outstretched to the board.
-      _arm(canvas, shoulder, -swing, limb); // free arm
-      const hand = Offset(32, -44); // hand reaches out at shoulder height
-      final elbow = Offset.lerp(shoulder, hand, 0.5)! + const Offset(1, -3);
-      canvas.drawLine(shoulder, elbow, limb);
-      canvas.drawLine(elbow, hand, limb);
+      // Both arms raised overhead, steadying the board balanced on his head.
+      _armUp(canvas, shoulder, -1, limb);
+      _armUp(canvas, shoulder, 1, limb);
     }
 
     // --- Neck + head with a little face ---
@@ -413,6 +397,14 @@ class _RoadRunnerPainter extends CustomPainter {
   void _arm(Canvas canvas, Offset shoulder, double angle, Paint p) {
     final hand = shoulder + _polar(angle, 16);
     canvas.drawLine(shoulder, hand, p);
+  }
+
+  // Arm raised overhead (side = -1 left, +1 right) to steady the head-board.
+  void _armUp(Canvas canvas, Offset shoulder, int side, Paint p) {
+    final elbow = shoulder + Offset(side * 7.0, -10);
+    final hand = elbow + Offset(side * 3.0, -12); // hand up near the board
+    canvas.drawLine(shoulder, elbow, p);
+    canvas.drawLine(elbow, hand, p);
   }
 
   Offset _polar(double angle, double len) =>
