@@ -5,8 +5,9 @@ import '../core/theme.dart';
 
 /// A transparent bottom navigation that lives *inside* the scene: a little
 /// human runs along a road between two wooden roadside signboards (Home /
-/// Levels). Tapping a tab makes him run to that board and lift it onto his
-/// hands (carry pose). The active board is the one he is holding.
+/// Levels). The road sits on the very bottom of the screen. Tapping a tab
+/// makes him run to that board; when he arrives he holds it up in one hand
+/// (the active board). The other board stays planted on its post.
 class WalkingNavBar extends StatefulWidget {
   final int index; // 0 = Home, 1 = Levels
   final ValueChanged<int> onTap;
@@ -18,7 +19,7 @@ class WalkingNavBar extends StatefulWidget {
 
 class _WalkingNavBarState extends State<WalkingNavBar>
     with TickerProviderStateMixin {
-  static const double _height = 132;
+  static const double _height = 150;
 
   late final AnimationController _run =
       AnimationController(vsync: this, duration: const Duration(milliseconds: 600))
@@ -52,7 +53,7 @@ class _WalkingNavBarState extends State<WalkingNavBar>
     super.dispose();
   }
 
-  double _boardCx(double w, int i) => i == 0 ? w * 0.22 : w * 0.78;
+  double _boardCx(double w, int i) => i == 0 ? w * 0.24 : w * 0.76;
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +63,8 @@ class _WalkingNavBarState extends State<WalkingNavBar>
       child: LayoutBuilder(
         builder: (context, c) {
           final w = c.maxWidth;
+          // Road touches the very bottom (covering the system-nav inset).
+          final roadY = c.maxHeight - 4;
           return AnimatedBuilder(
             animation: Listenable.merge([_run, _trans]),
             builder: (context, _) {
@@ -69,16 +72,16 @@ class _WalkingNavBarState extends State<WalkingNavBar>
               final t = _trans.value;
               final p = transitioning ? Curves.easeInOut.transform(t) : 1.0;
               final dir = (_to >= _from) ? 1.0 : -1.0;
-              final roadY = _height * 0.80;
 
               final humanX = transitioning
                   ? _lerp(_boardCx(w, _from), _boardCx(w, _to), p)
                   : _boardCx(w, widget.index);
+              final bob = math.sin(_run.value * math.pi * 2 * 2).abs() *
+                  (transitioning ? 4 : 2);
 
               return Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  // Road + human (painted).
                   Positioned.fill(
                     child: CustomPaint(
                       painter: _RoadRunnerPainter(
@@ -87,14 +90,14 @@ class _WalkingNavBarState extends State<WalkingNavBar>
                         humanX: humanX,
                         roadY: roadY,
                         dir: dir,
+                        bob: bob,
                       ),
                     ),
                   ),
-                  // Two signboards.
-                  _board(w, 0, 'HOME', '0 km', Icons.home_rounded, roadY,
-                      transitioning, p, humanX),
-                  _board(w, 1, 'LEVELS', '100 km', Icons.flag_rounded, roadY,
-                      transitioning, p, humanX),
+                  _board(w, 0, 'HOME', Icons.home_rounded, roadY, transitioning,
+                      humanX, bob),
+                  _board(w, 1, 'LEVELS', Icons.flag_rounded, roadY,
+                      transitioning, humanX, bob),
                 ],
               );
             },
@@ -104,45 +107,113 @@ class _WalkingNavBarState extends State<WalkingNavBar>
     );
   }
 
-  Widget _board(double w, int i, String title, String sub, IconData icon,
-      double roadY, bool transitioning, double p, double humanX) {
-    final cx = _boardCx(w, i);
-    final active = widget.index == i;
+  Widget _board(double w, int i, String title, IconData icon, double roadY,
+      bool transitioning, double humanX, double bob) {
+    final carried = (i == widget.index) && !transitioning;
+    const plankW = 96.0;
+    const plankH = 38.0;
+    const postH = 40.0;
 
-    // How "lifted" (carried) the board is: high when the human is at it.
-    double lift;
-    if (!transitioning) {
-      lift = active ? 10 + math.sin(_run.value * math.pi * 2) * 3 : 0;
+    double left;
+    double top;
+    if (carried) {
+      // Held up in the human's right hand, beside his head.
+      final handX = humanX + 20;
+      final handY = roadY - bob - 64;
+      left = handX - 8; // hand grips the left edge of the plank
+      top = handY - plankH + 4 + math.sin(_run.value * math.pi * 2) * 2;
     } else {
-      final nearTo = i == _to ? (p > 0.65 ? (p - 0.65) / 0.35 : 0.0) : 0.0;
-      final leaveFrom = i == _from ? (1 - p).clamp(0.0, 1.0) : 0.0;
-      lift = (i == _to)
-          ? nearTo * 12
-          : (i == _from ? leaveFrom * 8 : 0);
+      // Planted on a post on the road.
+      final cx = _boardCx(w, i);
+      left = cx - plankW / 2;
+      top = roadY - postH - plankH;
     }
 
-    const postH = 34.0;
-    const plankH = 40.0;
-    const plankW = 104.0;
-    final baseY = roadY; // post bottom sits on the road
-    final top = baseY - postH - plankH - lift;
-
     return Positioned(
-      left: cx - plankW / 2,
+      left: left,
       top: top,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => widget.onTap(i),
         child: Column(
           children: [
-            _plank(title, sub, icon, plankW, plankH, active),
-            // Post.
-            Container(
-              width: 8,
-              height: postH,
-              decoration: BoxDecoration(
-                color: const Color(0xFF7A5230),
-                borderRadius: BorderRadius.circular(3),
+            _woodPlank(title, icon, plankW, plankH, carried),
+            if (!carried)
+              Container(
+                width: 9,
+                height: postH,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [Color(0xFF6B4423), Color(0xFF8A5A2B), Color(0xFF6B4423)],
+                  ),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// A chunky wooden plank: layered planks, grain lines, rounded ends.
+  Widget _woodPlank(String title, IconData icon, double wdt, double hgt,
+      bool active) {
+    return Container(
+      width: wdt,
+      height: hgt,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF5A3617), width: 2.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.22),
+            offset: const Offset(0, 3),
+            blurRadius: 4,
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Stack(
+          children: [
+            // Base wood gradient.
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: active
+                        ? const [Color(0xFFC07B3C), Color(0xFF9A5E27)]
+                        : const [Color(0xFFCB9A6B), Color(0xFFA87B4E)],
+                  ),
+                ),
+              ),
+            ),
+            // Wood grain lines.
+            Positioned.fill(
+              child: CustomPaint(painter: _GrainPainter()),
+            ),
+            // Plank split line.
+            Positioned(
+              left: 0,
+              right: 0,
+              top: hgt / 2 - 1,
+              child: Container(
+                  height: 1.5, color: const Color(0x556B4423)),
+            ),
+            // Label.
+            Center(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 15, color: Colors.white),
+                  const SizedBox(width: 5),
+                  Text(title,
+                      style: AppTheme.title(15, color: Colors.white)),
+                ],
               ),
             ),
           ],
@@ -151,51 +222,26 @@ class _WalkingNavBarState extends State<WalkingNavBar>
     );
   }
 
-  Widget _plank(String title, String sub, IconData icon, double wdt, double hgt,
-      bool active) {
-    return Container(
-      width: wdt,
-      height: hgt,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: active
-              ? const [Color(0xFFB9763C), Color(0xFF935A28)]
-              : const [Color(0xFFC9966A), Color(0xFFA9794E)],
-        ),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF6B4423), width: 2.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            offset: const Offset(0, 3),
-            blurRadius: 3,
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 16, color: Colors.white),
-          const SizedBox(width: 5),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: AppTheme.title(14, color: Colors.white)),
-              Text(sub,
-                  style: AppTheme.title(9,
-                      color: Colors.white.withValues(alpha: 0.85))),
-            ],
-          ),
-        ],
-      ),
-    );
+  double _lerp(double a, double b, double t) => a + (b - a) * t;
+}
+
+class _GrainPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()
+      ..color = const Color(0x33000000)
+      ..strokeWidth = 1;
+    for (double y = 6; y < size.height; y += 9) {
+      final path = Path()..moveTo(0, y);
+      for (double x = 0; x <= size.width; x += 16) {
+        path.relativeQuadraticBezierTo(8, 2, 16, 0);
+      }
+      canvas.drawPath(path, p..style = PaintingStyle.stroke);
+    }
   }
 
-  double _lerp(double a, double b, double t) => a + (b - a) * t;
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _RoadRunnerPainter extends CustomPainter {
@@ -204,6 +250,7 @@ class _RoadRunnerPainter extends CustomPainter {
   final double humanX;
   final double roadY;
   final double dir;
+  final double bob;
 
   _RoadRunnerPainter({
     required this.run,
@@ -211,21 +258,21 @@ class _RoadRunnerPainter extends CustomPainter {
     required this.humanX,
     required this.roadY,
     required this.dir,
+    required this.bob,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    _drawRoad(canvas, w);
+    _drawRoad(canvas, size.width);
     _drawHuman(canvas, Offset(humanX, roadY));
   }
 
   void _drawRoad(Canvas canvas, double w) {
     final road = Paint()
       ..color = const Color(0xFF8A5A2B)
-      ..strokeWidth = 10
+      ..strokeWidth = 12
       ..strokeCap = StrokeCap.round;
-    canvas.drawLine(Offset(6, roadY), Offset(w - 6, roadY), road);
+    canvas.drawLine(Offset(0, roadY), Offset(w, roadY), road);
 
     final dash = Paint()
       ..color = Colors.white.withValues(alpha: 0.8)
@@ -233,17 +280,15 @@ class _RoadRunnerPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
     const gap = 34.0;
     final shift = run * gap;
-    for (double x = 6 - shift; x < w - 6; x += gap) {
+    for (double x = -shift; x < w; x += gap) {
       canvas.drawLine(Offset(x, roadY), Offset(x + 14, roadY), dash);
     }
   }
 
   void _drawHuman(Canvas canvas, Offset feet) {
     final phase = run * math.pi * 2;
-    // Running: bigger, faster swing. Carrying (idle): gentle.
-    final swing = math.sin(phase) * (transitioning ? 0.9 : 0.25);
-    final bob = math.sin(phase * 2).abs() * (transitioning ? 4 : 2);
-    final lean = transitioning ? 0.25 * dir : 0.0; // forward lean while running
+    final swing = math.sin(phase) * (transitioning ? 0.9 : 0.2);
+    final lean = transitioning ? 0.22 * dir : 0.0;
     final facing = transitioning ? dir : 1.0;
 
     canvas.save();
@@ -260,6 +305,11 @@ class _RoadRunnerPainter extends CustomPainter {
       ..color = AppColors.accent
       ..strokeWidth = 7
       ..strokeCap = StrokeCap.round;
+    final armPaint = Paint()
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke
+      ..color = AppColors.accentDark;
 
     const hip = Offset(0, -26);
     const shoulder = Offset(0, -46);
@@ -268,20 +318,14 @@ class _RoadRunnerPainter extends CustomPainter {
     _leg(canvas, hip, -swing, legPaint);
     canvas.drawLine(hip, shoulder, bodyPaint);
 
-    final armPaint = Paint()
-      ..strokeWidth = 5
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke
-      ..color = AppColors.accentDark;
-
     if (transitioning) {
-      // Arms pump while running.
+      // Running — arms pump.
       _arm(canvas, shoulder, -swing * 1.2, armPaint);
       _arm(canvas, shoulder, swing * 1.2, armPaint);
     } else {
-      // Carry pose: both arms raised up, holding the board overhead.
-      _armRaised(canvas, shoulder, -0.5, armPaint);
-      _armRaised(canvas, shoulder, 0.5, armPaint);
+      // One arm down at side, one arm raised up holding the board.
+      _arm(canvas, shoulder, 0.25, armPaint); // resting arm
+      _armRaised(canvas, shoulder, armPaint); // holding arm (to the right)
     }
 
     // Head.
@@ -311,10 +355,10 @@ class _RoadRunnerPainter extends CustomPainter {
     canvas.drawLine(shoulder, hand, p);
   }
 
-  // Arm reaching up (for carrying the board).
-  void _armRaised(Canvas canvas, Offset shoulder, double spread, Paint p) {
-    final elbow = shoulder + Offset(spread * 8, -10);
-    final hand = elbow + Offset(spread * 4, -12);
+  // Right arm reaching up to grip the carried board.
+  void _armRaised(Canvas canvas, Offset shoulder, Paint p) {
+    final elbow = shoulder + const Offset(10, -8);
+    final hand = elbow + const Offset(10, -10);
     canvas.drawLine(shoulder, elbow, p);
     canvas.drawLine(elbow, hand, p);
   }
