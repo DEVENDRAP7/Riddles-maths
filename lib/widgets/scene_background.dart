@@ -119,6 +119,16 @@ class _Frame extends StatelessWidget {
               ),
             ),
           ),
+          // Rotating sunlight rays (god rays) behind the sun.
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _SunRaysPainter(
+                center: Offset(sunLeft ? 71 : width - 71, 107),
+                rotation: drift * math.pi * 2,
+                pulse: sun,
+              ),
+            ),
+          ),
           Positioned(
             top: 64,
             left: sunLeft ? 28 : null,
@@ -142,9 +152,13 @@ class _Frame extends StatelessWidget {
               ),
             ),
           ),
+          _cloud(width, top: 90, scale: 0.85, phase: 0.15),
           _cloud(width, top: 120, scale: 1.0, phase: 0.0),
+          _cloud(width, top: 175, scale: 0.55, phase: 0.6),
           _cloud(width, top: 220, scale: 0.7, phase: 0.45),
+          _cloud(width, top: 270, scale: 0.9, phase: 0.9),
           _cloud(width, top: 330, scale: 1.2, phase: 0.8),
+          _cloud(width, top: 400, scale: 0.6, phase: 0.3),
           Align(
             alignment: Alignment.bottomCenter,
             child: SizedBox(
@@ -198,6 +212,49 @@ class _Cloud extends StatelessWidget {
           ),
         ),
       );
+}
+
+class _SunRaysPainter extends CustomPainter {
+  final Offset center;
+  final double rotation;
+  final double pulse; // 0..1 from the sun controller
+
+  _SunRaysPainter({
+    required this.center,
+    required this.rotation,
+    required this.pulse,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const rays = 12;
+    final length = 220 + pulse * 30;
+    final paint = Paint()
+      ..color = AppColors.sunYellow.withValues(alpha: 0.16 + pulse * 0.06)
+      ..style = PaintingStyle.fill;
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(rotation);
+    const step = math.pi * 2 / rays;
+    const halfWidth = 0.05; // angular half-width of each beam
+    for (var i = 0; i < rays; i++) {
+      final a = i * step;
+      final p1 = Offset(math.cos(a - halfWidth), math.sin(a - halfWidth)) * length;
+      final p2 = Offset(math.cos(a + halfWidth), math.sin(a + halfWidth)) * length;
+      final path = Path()
+        ..moveTo(0, 0)
+        ..lineTo(p1.dx, p1.dy)
+        ..lineTo(p2.dx, p2.dy)
+        ..close();
+      canvas.drawPath(path, paint);
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _SunRaysPainter old) =>
+      old.rotation != rotation || old.pulse != pulse;
 }
 
 class _HillsPainter extends CustomPainter {
