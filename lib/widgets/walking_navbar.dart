@@ -77,7 +77,11 @@ class _WalkingNavBarState extends State<WalkingNavBar>
                   ? _lerp(_boardCx(w, _from), _boardCx(w, _to), p)
                   : _boardCx(w, widget.index);
               final bob = math.sin(_run.value * math.pi * 2 * 2).abs() *
-                  (transitioning ? 4 : 2);
+                  (transitioning ? 3 : 1.5);
+              // Idle: face inward so the held board points to centre (stays
+              // on-screen). Running: face the direction of travel.
+              final facing =
+                  transitioning ? dir : (widget.index == 0 ? 1.0 : -1.0);
 
               return Stack(
                 clipBehavior: Clip.none,
@@ -89,7 +93,7 @@ class _WalkingNavBarState extends State<WalkingNavBar>
                         transitioning: transitioning,
                         humanX: humanX,
                         roadY: roadY,
-                        dir: dir,
+                        facing: facing,
                         bob: bob,
                       ),
                     ),
@@ -115,20 +119,27 @@ class _WalkingNavBarState extends State<WalkingNavBar>
     const postH = 42.0;
 
     if (carried) {
-      // Held out front in the human's outstretched right hand, tilted up.
-      final handX = humanX + 46; // matches arm reach in the painter (scale 1.35)
+      // Held out front in the human's outstretched hand, pointing toward the
+      // centre of the screen so it never runs off the edge.
+      final face = i == 0 ? 1.0 : -1.0;
+      final handX = humanX + 46 * face; // matches arm reach in the painter
       final handY = roadY - bob - 62;
       final wob = math.sin(_run.value * math.pi * 2) * 1.5;
+      // For face=1 the plank extends right (near end = left). For face=-1 it
+      // extends left (near end = right).
+      final left = face == 1 ? handX - 10 : handX + 10 - plankW;
       return Positioned(
-        left: handX - 10, // hand grips the near end
+        left: left,
         top: handY - plankH / 2 + wob,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () => widget.onTap(i),
           child: Transform.rotate(
-            alignment: Alignment.centerLeft,
-            angle: -0.14,
-            child: _woodPlank(title, icon, plankW, plankH, true),
+            alignment:
+                face == 1 ? Alignment.centerLeft : Alignment.centerRight,
+            angle: -0.14 * face,
+            child: _woodPlank(title, icon, plankW, plankH, true,
+                gripLeft: face == 1),
           ),
         ),
       );
@@ -165,7 +176,7 @@ class _WalkingNavBarState extends State<WalkingNavBar>
 
   /// A chunky wooden plank: layered planks, grain lines, rounded ends.
   Widget _woodPlank(String title, IconData icon, double wdt, double hgt,
-      bool active) {
+      bool active, {bool gripLeft = true}) {
     return Container(
       width: wdt,
       height: hgt,
@@ -210,9 +221,10 @@ class _WalkingNavBarState extends State<WalkingNavBar>
               child: Container(
                   height: 1.5, color: const Color(0x556B4423)),
             ),
-            // Grip / handle on the near (left) end.
+            // Grip / handle on the near end (the hand side).
             Positioned(
-              left: 4,
+              left: gripLeft ? 4 : null,
+              right: gripLeft ? null : 4,
               top: hgt / 2 - 7,
               child: Container(
                 width: 10,
@@ -225,7 +237,8 @@ class _WalkingNavBarState extends State<WalkingNavBar>
             ),
             // Label.
             Padding(
-              padding: const EdgeInsets.only(left: 14),
+              padding: EdgeInsets.only(
+                  left: gripLeft ? 14 : 0, right: gripLeft ? 0 : 14),
               child: Center(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -271,7 +284,7 @@ class _RoadRunnerPainter extends CustomPainter {
   final bool transitioning;
   final double humanX;
   final double roadY;
-  final double dir;
+  final double facing;
   final double bob;
 
   _RoadRunnerPainter({
@@ -279,7 +292,7 @@ class _RoadRunnerPainter extends CustomPainter {
     required this.transitioning,
     required this.humanX,
     required this.roadY,
-    required this.dir,
+    required this.facing,
     required this.bob,
   });
 
@@ -309,9 +322,8 @@ class _RoadRunnerPainter extends CustomPainter {
 
   void _drawHuman(Canvas canvas, Offset feet) {
     final phase = run * math.pi * 2;
-    final swing = math.sin(phase) * (transitioning ? 0.9 : 0.0);
-    final lean = transitioning ? 0.22 * dir : 0.0;
-    final facing = transitioning ? dir : 1.0;
+    final swing = math.sin(phase) * (transitioning ? 0.45 : 0.0);
+    final lean = transitioning ? 0.18 * facing : 0.0;
     const s = 1.35; // overall scale — bigger, clearer figure
 
     canvas.save();
