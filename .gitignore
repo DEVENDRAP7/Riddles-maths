@@ -43,3 +43,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Kotlin incremental build cache
+/android/.kotlin/
+
+# Desktop platform folders — this is an Android-only app
+/windows/
+/linux/
+/macos/

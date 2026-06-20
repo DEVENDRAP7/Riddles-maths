@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../ads/rewarded_ad_service.dart';
 import '../core/theme.dart';
 import '../data/level.dart';
 import '../state/providers.dart';
@@ -20,19 +21,76 @@ class PlayScreen extends ConsumerStatefulWidget {
 }
 
 class _PlayScreenState extends ConsumerState<PlayScreen> {
+  // Rewarded-ad gating (per PLAN.md): watch 3 ads to unlock the hint, then
+  // 1 more to reveal the solution.
+  static const int _hintAdsRequired = 3;
+  static const int _solutionAdsRequired = 1;
+
   final _controller = TextEditingController();
   final _confetti = ConfettiController(duration: const Duration(seconds: 2));
+  final _rewarded = RewardedAdService();
 
   bool _showHint = false;
   bool _showSolution = false;
   bool _solved = false;
   bool _wrong = false;
+  int _hintAdsWatched = 0;
+  int _solutionAdsWatched = 0;
+  bool _watchingAd = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _rewarded.load();
+  }
 
   @override
   void dispose() {
     _controller.dispose();
     _confetti.dispose();
+    _rewarded.dispose();
     super.dispose();
+  }
+
+  /// Shows one rewarded ad; on reward, runs [onReward]. Guards against double
+  /// taps and surfaces a message if no ad is ready yet.
+  void _watchAd(VoidCallback onReward) {
+    if (_watchingAd) return;
+    setState(() => _watchingAd = true);
+    _rewarded.show(
+      onEarned: () {
+        if (!mounted) return;
+        setState(() => _watchingAd = false);
+        onReward();
+      },
+      onUnavailable: () {
+        if (!mounted) return;
+        setState(() => _watchingAd = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ad not ready yet — try again in a moment.'),
+          ),
+        );
+      },
+    );
+  }
+
+  void _watchForHint() {
+    _watchAd(() {
+      setState(() {
+        _hintAdsWatched++;
+        if (_hintAdsWatched >= _hintAdsRequired) _showHint = true;
+      });
+    });
+  }
+
+  void _watchForSolution() {
+    _watchAd(() {
+      setState(() {
+        _solutionAdsWatched++;
+        if (_solutionAdsWatched >= _solutionAdsRequired) _showSolution = true;
+      });
+    });
   }
 
   void _check(Level level) {
@@ -84,11 +142,18 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                               const SizedBox(height: 20),
                               if (!_solved) _answerField(level),
                               if (_wrong && !_solved) _wrongBanner(),
-                              if (_showHint && !_solved) _infoCard(
-                                  '💡 Hint', level.hint, AppColors.sunYellow),
-                              if (_showSolution && !_solved) _infoCard(
-                                  '✅ Solution', level.solution,
-                                  AppColors.grassGreen),
+                              if (_showHint && !_solved)
+                                _infoCard(
+                                  '💡 Hint',
+                                  level.hint,
+                                  AppColors.sunYellow,
+                                ),
+                              if (_showSolution && !_solved)
+                                _infoCard(
+                                  '✅ Solution',
+                                  level.solution,
+                                  AppColors.grassGreen,
+                                ),
                               if (_solved) _solvedCard(level, hasNext),
                               const SizedBox(height: 16),
                               if (!_solved) _helpButtons(),
@@ -139,8 +204,10 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: AppColors.accent, width: 2),
             ),
-            child: Text('Level $lvl / $total',
-                style: AppTheme.title(18, color: AppColors.ink)),
+            child: Text(
+              'Level $lvl / $total',
+              style: AppTheme.title(18, color: AppColors.ink),
+            ),
           ),
           const Spacer(),
           const SizedBox(width: 28),
@@ -167,8 +234,10 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
       ),
       child: Column(
         children: [
-          Text('Crack the pattern',
-              style: AppTheme.title(16, color: AppColors.coral)),
+          Text(
+            'Crack the pattern',
+            style: AppTheme.title(16, color: AppColors.coral),
+          ),
           const SizedBox(height: 16),
           Text(
             level.question,
@@ -193,8 +262,10 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
   void _backspace() {
     if (_controller.text.isEmpty) return;
     setState(() {
-      _controller.text =
-          _controller.text.substring(0, _controller.text.length - 1);
+      _controller.text = _controller.text.substring(
+        0,
+        _controller.text.length - 1,
+      );
       _wrong = false;
     });
   }
@@ -284,10 +355,10 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
   Widget _wrongBanner() {
     return Padding(
       padding: const EdgeInsets.only(top: 16),
-      child: Text('Not quite — try again! 🤔',
-              style: AppTheme.title(18, color: AppColors.coral))
-          .animate()
-          .shakeX(hz: 4, amount: 4),
+      child: Text(
+        'Not quite — try again! 🤔',
+        style: AppTheme.title(18, color: AppColors.coral),
+      ).animate().shakeX(hz: 4, amount: 4),
     );
   }
 
@@ -320,23 +391,27 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
       children: [
         if (!_showHint)
           BouncyButton(
-            label: 'HINT',
-            icon: Icons.lightbulb_rounded,
+            // Watch 3 rewarded ads to unlock the hint; label shows progress.
+            label: _hintAdsWatched == 0
+                ? 'HINT'
+                : 'HINT  ($_hintAdsWatched/$_hintAdsRequired)',
+            icon: Icons.play_circle_fill_rounded,
             color: AppColors.sunYellow,
             baseColor: const Color(0xFFD9A800),
             height: 54,
             fontSize: 18,
-            onTap: () => setState(() => _showHint = true),
+            onTap: _watchingAd ? null : _watchForHint,
           ),
         if (_showHint && !_showSolution)
           BouncyButton(
+            // One more rewarded ad reveals the solution.
             label: 'SOLUTION',
-            icon: Icons.visibility_rounded,
+            icon: Icons.play_circle_fill_rounded,
             color: AppColors.accent,
             baseColor: AppColors.accentDark,
             height: 54,
             fontSize: 18,
-            onTap: () => setState(() => _showSolution = true),
+            onTap: _watchingAd ? null : _watchForSolution,
           ),
       ],
     );
@@ -354,12 +429,15 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
       ),
       child: Column(
         children: [
-          Text('🎉 Correct!', style: AppTheme.title(30, color: AppColors.grassGreen))
-              .animate()
-              .scale(curve: Curves.elasticOut, duration: 600.ms),
+          Text(
+            '🎉 Correct!',
+            style: AppTheme.title(30, color: AppColors.grassGreen),
+          ).animate().scale(curve: Curves.elasticOut, duration: 600.ms),
           const SizedBox(height: 8),
-          Text('Answer: ${level.answer}',
-              style: AppTheme.title(20, color: AppColors.ink)),
+          Text(
+            'Answer: ${level.answer}',
+            style: AppTheme.title(20, color: AppColors.ink),
+          ),
           const SizedBox(height: 20),
           Wrap(
             alignment: WrapAlignment.center,
@@ -381,8 +459,8 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                   color: AppColors.coral,
                   height: 56,
                   fontSize: 18,
-                  onTap: () => context.pushReplacement(
-                      '/play/${level.level + 1}'),
+                  onTap: () =>
+                      context.pushReplacement('/play/${level.level + 1}'),
                 ),
             ],
           ),

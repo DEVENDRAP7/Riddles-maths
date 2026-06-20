@@ -7,7 +7,9 @@ import '../core/theme.dart';
 class BouncyButton extends StatefulWidget {
   final String label;
   final IconData? icon;
-  final VoidCallback onTap;
+
+  /// Tap handler. When null the button is shown dimmed and ignores taps.
+  final VoidCallback? onTap;
   final Color color;
   final Color baseColor;
   final double height;
@@ -16,7 +18,7 @@ class BouncyButton extends StatefulWidget {
   const BouncyButton({
     super.key,
     required this.label,
-    required this.onTap,
+    this.onTap,
     this.icon,
     this.color = AppColors.coral,
     this.baseColor = const Color(0xFFC9483D),
@@ -33,41 +35,49 @@ class _BouncyButtonState extends State<BouncyButton> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _down = true),
-      onTapUp: (_) => setState(() => _down = false),
-      onTapCancel: () => setState(() => _down = false),
-      onTap: widget.onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 90),
-        transform: Matrix4.translationValues(0, _down ? 6 : 0, 0),
-        height: widget.height,
-        padding: const EdgeInsets.symmetric(horizontal: 28),
-        decoration: BoxDecoration(
-          color: widget.color,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: Colors.white, width: 3),
-          boxShadow: [
-            BoxShadow(
-              color: widget.baseColor,
-              offset: Offset(0, _down ? 2 : 8),
-              blurRadius: 0,
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (widget.icon != null) ...[
-              Icon(widget.icon, color: Colors.white, size: widget.fontSize + 4),
-              const SizedBox(width: 10),
+    final enabled = widget.onTap != null;
+    return Opacity(
+      opacity: enabled ? 1.0 : 0.55,
+      child: GestureDetector(
+        onTapDown: enabled ? (_) => setState(() => _down = true) : null,
+        onTapUp: enabled ? (_) => setState(() => _down = false) : null,
+        onTapCancel: enabled ? () => setState(() => _down = false) : null,
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 90),
+          transform: Matrix4.translationValues(0, _down ? 6 : 0, 0),
+          height: widget.height,
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          decoration: BoxDecoration(
+            color: widget.color,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: Colors.white, width: 3),
+            boxShadow: [
+              BoxShadow(
+                color: widget.baseColor,
+                offset: Offset(0, _down ? 2 : 8),
+                blurRadius: 0,
+              ),
             ],
-            Text(
-              widget.label,
-              style: AppTheme.title(widget.fontSize, color: Colors.white),
-            ),
-          ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (widget.icon != null) ...[
+                Icon(
+                  widget.icon,
+                  color: Colors.white,
+                  size: widget.fontSize + 4,
+                ),
+                const SizedBox(width: 10),
+              ],
+              Text(
+                widget.label,
+                style: AppTheme.title(widget.fontSize, color: Colors.white),
+              ),
+            ],
+          ),
         ),
       ),
     );

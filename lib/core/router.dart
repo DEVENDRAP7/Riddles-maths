@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../ads/banner_ad_widget.dart';
 import '../screens/home_screen.dart';
 import '../screens/levels_screen.dart';
 import '../screens/play_screen.dart';
@@ -75,25 +76,34 @@ class _ShellScaffoldState extends State<_ShellScaffold>
     final index = _indexFor(widget.location);
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Stack(
+      body: Column(
         children: [
-          Positioned.fill(
-            child: AnimatedBuilder(
-              animation: _pan,
-              builder: (context, _) => SceneBackground(pan: _pan.value),
+          // Scene + content + walking navbar fill the space above the ad.
+          Expanded(
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: AnimatedBuilder(
+                    animation: _pan,
+                    builder: (context, _) => SceneBackground(pan: _pan.value),
+                  ),
+                ),
+                Positioned.fill(child: widget.child),
+                // Navbar merged into the scene (transparent, on the road).
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: WalkingNavBar(
+                    index: index,
+                    onTap: (i) => context.go(i == 0 ? '/home' : '/levels'),
+                  ),
+                ),
+              ],
             ),
           ),
-          Positioned.fill(child: widget.child),
-          // Navbar merged into the scene (transparent, on the road).
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: WalkingNavBar(
-              index: index,
-              onTap: (i) => context.go(i == 0 ? '/home' : '/levels'),
-            ),
-          ),
+          // Banner ad anchored right below the walking human navbar.
+          const SafeArea(top: false, child: BannerAdWidget()),
         ],
       ),
     );
