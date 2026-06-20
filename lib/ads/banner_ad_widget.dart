@@ -1,7 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
+import '../core/theme.dart';
 import 'ad_ids.dart';
+
+/// A neutral bar that holds a [BannerAdWidget], kept visually separate from the
+/// animated scene: solid background + a top divider so it reads as a distinct
+/// ad strip, not part of the game art. Collapses to nothing when no ad loaded.
+class AdBar extends StatelessWidget {
+  const AdBar({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: AppColors.cream,
+        border: Border(top: BorderSide(color: AppColors.ink, width: 1.5)),
+      ),
+      child: const SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 6),
+          child: Center(child: BannerAdWidget()),
+        ),
+      ),
+    );
+  }
+}
 
 /// A self-contained AdMob banner. Loads on first build, reserves its height so
 /// the layout doesn't jump, and disposes the ad when removed. Renders nothing

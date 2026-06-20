@@ -31,8 +31,10 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
   final _confetti = ConfettiController(duration: const Duration(seconds: 2));
   final _rewarded = RewardedAdService();
 
-  bool _showHint = false;
-  bool _showSolution = false;
+  bool _hintUnlocked = false; // 3 ads watched
+  bool _solutionUnlocked = false; // hint used + 1 ad watched
+  bool _showHintOverlay = false; // hint overlay currently visible
+  bool _showSolutionOverlay = false; // solution overlay currently visible
   bool _solved = false;
   bool _wrong = false;
   int _hintAdsWatched = 0;
@@ -58,9 +60,14 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  /// Plays the 3 rewarded ads one after another, then unlocks the hint.
+  /// HINT button. If already unlocked, just re-open the overlay. Otherwise
+  /// plays the 3 rewarded ads one after another, then unlocks + shows it.
   /// Resumes from where it left off if the user bailed partway through.
   Future<void> _watchAdsForHint() async {
+    if (_hintUnlocked) {
+      setState(() => _showHintOverlay = true);
+      return;
+    }
     if (_watchingAd) return;
     setState(() => _watchingAd = true);
     while (_hintAdsWatched < _hintAdsRequired) {
@@ -75,24 +82,32 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
     }
     setState(() {
       _watchingAd = false;
-      _showHint = true;
+      _hintUnlocked = true;
+      _showHintOverlay = true;
     });
   }
 
-  /// Reveals the solution — but only after the hint is unlocked, and only
-  /// after watching one more rewarded ad.
+  /// SOLUTION button. Locked until the hint is used. If already unlocked,
+  /// re-open the overlay; otherwise watch one more rewarded ad to unlock it.
   Future<void> _watchForSolution() async {
-    if (_watchingAd) return;
-    if (!_showHint) {
+    if (!_hintUnlocked) {
       _snack('Use the hint first.');
       return;
     }
+    if (_solutionUnlocked) {
+      setState(() => _showSolutionOverlay = true);
+      return;
+    }
+    if (_watchingAd) return;
     setState(() => _watchingAd = true);
     final earned = await _rewarded.show();
     if (!mounted) return;
     setState(() {
       _watchingAd = false;
-      if (earned) _showSolution = true;
+      if (earned) {
+        _solutionUnlocked = true;
+        _showSolutionOverlay = true;
+      }
     });
     if (!earned) _snack('Watch the ad to reveal the solution.');
   }
@@ -118,10 +133,10 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: CartoonBackground(
-        child: Column(
-          children: [
-            Expanded(
+      body: Column(
+        children: [
+          Expanded(
+            child: CartoonBackground(
               child: SafeArea(
                 bottom: false,
                 child: levelsAsync.when(
@@ -139,11 +154,12 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                     return Stack(
                       alignment: Alignment.topCenter,
                       children: [
+                        // Fixed (non-scrolling) play layout.
                         Column(
                           children: [
                             _topBar(context, level.level, total),
                             Expanded(
-                              child: SingleChildScrollView(
+                              child: Padding(
                                 padding: const EdgeInsets.fromLTRB(
                                   24,
                                   8,
@@ -156,14 +172,6 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                                     const SizedBox(height: 20),
                                     if (!_solved) _answerField(level),
                                     if (_wrong && !_solved) _wrongBanner(),
-                                    if (_showHint && !_solved)
-                                      _hintScroll(level.hint),
-                                    if (_showSolution && !_solved)
-                                      _infoCard(
-                                        '✅ Solution',
-                                        level.solution,
-                                        AppColors.grassGreen,
-                                      ),
                                     if (_solved) _solvedCard(level, hasNext),
                                     const SizedBox(height: 16),
                                     if (!_solved) _helpButtons(),
@@ -186,24 +194,33 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                             AppColors.accent,
                           ],
                         ),
+                        // Hint / solution as centered overlays above everything.
+                        // Closing returns to the puzzle so the answer can be typed.
+                        if (_showHintOverlay && !_solved)
+                          _overlay(
+                            content: _hintScroll(level.hint),
+                            onClose: () =>
+                                setState(() => _showHintOverlay = false),
+                          ),
+                        if (_showSolutionOverlay && !_solved)
+                          _overlay(
+                            content: _infoCard(
+                              '✅ Solution',
+                              level.solution,
+                              AppColors.grassGreen,
+                            ),
+                            onClose: () =>
+                                setState(() => _showSolutionOverlay = false),
+                          ),
                       ],
                     );
                   },
                 ),
               ),
             ),
-            // Banner ad on a grass strip at the bottom of the play screen.
-            Container(
-              width: double.infinity,
-              color: AppColors.grassGreen,
-              padding: const EdgeInsets.only(top: 8),
-              child: const SafeArea(
-                top: false,
-                child: Center(child: BannerAdWidget()),
-              ),
-            ),
-          ],
-        ),
+          ),
+          const AdBar(),
+        ],
       ),
     );
   }
@@ -412,34 +429,74 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
       spacing: 14,
       runSpacing: 12,
       children: [
-        if (!_showHint)
-          BouncyButton(
-            // One tap plays 3 rewarded ads back to back; label shows progress.
-            label: _watchingAd && _hintAdsWatched < _hintAdsRequired
-                ? 'AD $_hintAdsWatched/$_hintAdsRequired…'
-                : 'HINT  ·  WATCH $_hintAdsRequired ADS',
-            icon: Icons.play_circle_fill_rounded,
-            color: AppColors.sunYellow,
-            baseColor: const Color(0xFFD9A800),
-            height: 54,
-            fontSize: 18,
-            onTap: _watchingAd ? null : _watchAdsForHint,
-          ),
-        if (!_showSolution)
-          BouncyButton(
-            // Locked until the hint is used; then one rewarded ad reveals it.
-            label: 'SOLUTION',
-            icon: _showHint
-                ? Icons.play_circle_fill_rounded
-                : Icons.lock_rounded,
-            color: AppColors.accent,
-            baseColor: AppColors.accentDark,
-            height: 54,
-            fontSize: 18,
-            onTap: _watchingAd ? null : _watchForSolution,
-          ),
+        BouncyButton(
+          // Unlocked → just re-open. Locked → one tap plays 3 ads back to back.
+          label: _hintUnlocked
+              ? 'VIEW HINT'
+              : (_watchingAd && _hintAdsWatched < _hintAdsRequired
+                    ? 'AD $_hintAdsWatched/$_hintAdsRequired…'
+                    : 'HINT  ·  WATCH $_hintAdsRequired ADS'),
+          icon: _hintUnlocked
+              ? Icons.lightbulb_rounded
+              : Icons.play_circle_fill_rounded,
+          color: AppColors.sunYellow,
+          baseColor: const Color(0xFFD9A800),
+          height: 54,
+          fontSize: 18,
+          onTap: _watchingAd ? null : _watchAdsForHint,
+        ),
+        BouncyButton(
+          // Locked until hint used; then one ad reveals it, after that re-open.
+          label: _solutionUnlocked ? 'VIEW SOLUTION' : 'SOLUTION',
+          icon: !_hintUnlocked
+              ? Icons.lock_rounded
+              : (_solutionUnlocked
+                    ? Icons.visibility_rounded
+                    : Icons.play_circle_fill_rounded),
+          color: AppColors.accent,
+          baseColor: AppColors.accentDark,
+          height: 54,
+          fontSize: 18,
+          onTap: _watchingAd ? null : _watchForSolution,
+        ),
       ],
     );
+  }
+
+  /// A centered modal overlay above the whole play screen: dim barrier (tap to
+  /// close) + the [content] card + a CLOSE button so the puzzle is reachable
+  /// again to type the answer.
+  Widget _overlay({required Widget content, required VoidCallback onClose}) {
+    return Positioned.fill(
+      child: Stack(
+        children: [
+          GestureDetector(
+            onTap: onClose,
+            child: Container(color: Colors.black.withValues(alpha: 0.55)),
+          ),
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 40),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  content,
+                  const SizedBox(height: 18),
+                  BouncyButton(
+                    label: 'GOT IT',
+                    icon: Icons.check_rounded,
+                    color: AppColors.coral,
+                    height: 50,
+                    fontSize: 18,
+                    onTap: onClose,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 180.ms);
   }
 
   /// The hint shown as an animated parchment scroll: two wooden rolls with a

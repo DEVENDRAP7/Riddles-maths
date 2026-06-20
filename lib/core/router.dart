@@ -100,17 +100,9 @@ class _ShellScaffoldState extends State<_ShellScaffold>
               ],
             ),
           ),
-          // Banner ad on a soil strip below the road, so the walking-human
-          // road clearly sits *above* the ad with no overlap.
-          Container(
-            width: double.infinity,
-            color: const Color(0xFF6B4423), // earth under the road
-            padding: const EdgeInsets.only(top: 8),
-            child: const SafeArea(
-              top: false,
-              child: Center(child: BannerAdWidget()),
-            ),
-          ),
+          // Banner ad in its own neutral bar — visually separate from the
+          // animated scene (not styled like ground), with a divider on top.
+          const AdBar(),
         ],
       ),
     );
