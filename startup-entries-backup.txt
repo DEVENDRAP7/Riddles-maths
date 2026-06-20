@@ -1,0 +1,7 @@
+﻿# Backup of removed startup entries — 06/21/2026 00:45:56
+# To restore one, run its PowerShell line below.
+
+Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'Adobe Acrobat Synchronizer' -Value '"C:\Program Files\Adobe\Acrobat DC\Acrobat\AdobeCollabSync.exe"'
+Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'RiotClient' -Value 'C:\Riot Games\Riot Client\RiotClientServices.exe --launch-background-mode'
+Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'Teams' -Value '"C:\Users\deven\AppData\Local\Microsoft\WindowsApps\MSTeams_8wekyb3d8bbwe\ms-teams.exe" msteams:system-initiated'
+Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'Steam' -Value '"C:\Program Files (x86)\Steam\steam.exe" -silent'

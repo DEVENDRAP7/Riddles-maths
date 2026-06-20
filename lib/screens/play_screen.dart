@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../ads/banner_ad_widget.dart';
 import '../ads/rewarded_ad_service.dart';
 import '../core/theme.dart';
 import '../data/level.dart';
@@ -21,10 +22,10 @@ class PlayScreen extends ConsumerStatefulWidget {
 }
 
 class _PlayScreenState extends ConsumerState<PlayScreen> {
-  // Rewarded-ad gating (per PLAN.md): watch 3 ads to unlock the hint, then
-  // 1 more to reveal the solution.
+  // Rewarded-ad gating: one tap on HINT plays 3 rewarded ads back to back to
+  // unlock the hint; the SOLUTION button only works once the hint is unlocked,
+  // and then plays 1 more rewarded ad to reveal the worked solution.
   static const int _hintAdsRequired = 3;
-  static const int _solutionAdsRequired = 1;
 
   final _controller = TextEditingController();
   final _confetti = ConfettiController(duration: const Duration(seconds: 2));
@@ -35,7 +36,6 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
   bool _solved = false;
   bool _wrong = false;
   int _hintAdsWatched = 0;
-  int _solutionAdsWatched = 0;
   bool _watchingAd = false;
 
   @override
@@ -52,45 +52,49 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
     super.dispose();
   }
 
-  /// Shows one rewarded ad; on reward, runs [onReward]. Guards against double
-  /// taps and surfaces a message if no ad is ready yet.
-  void _watchAd(VoidCallback onReward) {
+  void _snack(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  /// Plays the 3 rewarded ads one after another, then unlocks the hint.
+  /// Resumes from where it left off if the user bailed partway through.
+  Future<void> _watchAdsForHint() async {
     if (_watchingAd) return;
     setState(() => _watchingAd = true);
-    _rewarded.show(
-      onEarned: () {
-        if (!mounted) return;
+    while (_hintAdsWatched < _hintAdsRequired) {
+      final earned = await _rewarded.show();
+      if (!mounted) return;
+      if (!earned) {
         setState(() => _watchingAd = false);
-        onReward();
-      },
-      onUnavailable: () {
-        if (!mounted) return;
-        setState(() => _watchingAd = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Ad not ready yet — try again in a moment.'),
-          ),
-        );
-      },
-    );
-  }
-
-  void _watchForHint() {
-    _watchAd(() {
-      setState(() {
-        _hintAdsWatched++;
-        if (_hintAdsWatched >= _hintAdsRequired) _showHint = true;
-      });
+        _snack('Watch all $_hintAdsRequired ads to unlock the hint.');
+        return;
+      }
+      setState(() => _hintAdsWatched++);
+    }
+    setState(() {
+      _watchingAd = false;
+      _showHint = true;
     });
   }
 
-  void _watchForSolution() {
-    _watchAd(() {
-      setState(() {
-        _solutionAdsWatched++;
-        if (_solutionAdsWatched >= _solutionAdsRequired) _showSolution = true;
-      });
+  /// Reveals the solution — but only after the hint is unlocked, and only
+  /// after watching one more rewarded ad.
+  Future<void> _watchForSolution() async {
+    if (_watchingAd) return;
+    if (!_showHint) {
+      _snack('Use the hint first.');
+      return;
+    }
+    setState(() => _watchingAd = true);
+    final earned = await _rewarded.show();
+    if (!mounted) return;
+    setState(() {
+      _watchingAd = false;
+      if (earned) _showSolution = true;
     });
+    if (!earned) _snack('Watch the ad to reveal the solution.');
   }
 
   void _check(Level level) {
@@ -115,71 +119,90 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: CartoonBackground(
-        child: SafeArea(
-          child: levelsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('Error: $e')),
-            data: (levels) {
-              final level = levels.firstWhere(
-                (l) => l.level == widget.levelNumber,
-                orElse: () => levels.first,
-              );
-              final total = levels.length;
-              final hasNext = level.level < total;
+        child: Column(
+          children: [
+            Expanded(
+              child: SafeArea(
+                bottom: false,
+                child: levelsAsync.when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(child: Text('Error: $e')),
+                  data: (levels) {
+                    final level = levels.firstWhere(
+                      (l) => l.level == widget.levelNumber,
+                      orElse: () => levels.first,
+                    );
+                    final total = levels.length;
+                    final hasNext = level.level < total;
 
-              return Stack(
-                alignment: Alignment.topCenter,
-                children: [
-                  Column(
-                    children: [
-                      _topBar(context, level.level, total),
-                      Expanded(
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-                          child: Column(
-                            children: [
-                              _questionCard(level),
-                              const SizedBox(height: 20),
-                              if (!_solved) _answerField(level),
-                              if (_wrong && !_solved) _wrongBanner(),
-                              if (_showHint && !_solved)
-                                _infoCard(
-                                  '💡 Hint',
-                                  level.hint,
-                                  AppColors.sunYellow,
+                    return Stack(
+                      alignment: Alignment.topCenter,
+                      children: [
+                        Column(
+                          children: [
+                            _topBar(context, level.level, total),
+                            Expanded(
+                              child: SingleChildScrollView(
+                                padding: const EdgeInsets.fromLTRB(
+                                  24,
+                                  8,
+                                  24,
+                                  24,
                                 ),
-                              if (_showSolution && !_solved)
-                                _infoCard(
-                                  '✅ Solution',
-                                  level.solution,
-                                  AppColors.grassGreen,
+                                child: Column(
+                                  children: [
+                                    _questionCard(level),
+                                    const SizedBox(height: 20),
+                                    if (!_solved) _answerField(level),
+                                    if (_wrong && !_solved) _wrongBanner(),
+                                    if (_showHint && !_solved)
+                                      _hintScroll(level.hint),
+                                    if (_showSolution && !_solved)
+                                      _infoCard(
+                                        '✅ Solution',
+                                        level.solution,
+                                        AppColors.grassGreen,
+                                      ),
+                                    if (_solved) _solvedCard(level, hasNext),
+                                    const SizedBox(height: 16),
+                                    if (!_solved) _helpButtons(),
+                                  ],
                                 ),
-                              if (_solved) _solvedCard(level, hasNext),
-                              const SizedBox(height: 16),
-                              if (!_solved) _helpButtons(),
-                            ],
-                          ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                  ConfettiWidget(
-                    confettiController: _confetti,
-                    blastDirectionality: BlastDirectionality.explosive,
-                    numberOfParticles: 24,
-                    maxBlastForce: 22,
-                    gravity: 0.3,
-                    colors: const [
-                      AppColors.coral,
-                      AppColors.sunYellow,
-                      AppColors.grassGreen,
-                      AppColors.accent,
-                    ],
-                  ),
-                ],
-              );
-            },
-          ),
+                        ConfettiWidget(
+                          confettiController: _confetti,
+                          blastDirectionality: BlastDirectionality.explosive,
+                          numberOfParticles: 24,
+                          maxBlastForce: 22,
+                          gravity: 0.3,
+                          colors: const [
+                            AppColors.coral,
+                            AppColors.sunYellow,
+                            AppColors.grassGreen,
+                            AppColors.accent,
+                          ],
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ),
+            // Banner ad on a grass strip at the bottom of the play screen.
+            Container(
+              width: double.infinity,
+              color: AppColors.grassGreen,
+              padding: const EdgeInsets.only(top: 8),
+              child: const SafeArea(
+                top: false,
+                child: Center(child: BannerAdWidget()),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -391,22 +414,24 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
       children: [
         if (!_showHint)
           BouncyButton(
-            // Watch 3 rewarded ads to unlock the hint; label shows progress.
-            label: _hintAdsWatched == 0
-                ? 'HINT'
-                : 'HINT  ($_hintAdsWatched/$_hintAdsRequired)',
+            // One tap plays 3 rewarded ads back to back; label shows progress.
+            label: _watchingAd && _hintAdsWatched < _hintAdsRequired
+                ? 'AD $_hintAdsWatched/$_hintAdsRequired…'
+                : 'HINT  ·  WATCH $_hintAdsRequired ADS',
             icon: Icons.play_circle_fill_rounded,
             color: AppColors.sunYellow,
             baseColor: const Color(0xFFD9A800),
             height: 54,
             fontSize: 18,
-            onTap: _watchingAd ? null : _watchForHint,
+            onTap: _watchingAd ? null : _watchAdsForHint,
           ),
-        if (_showHint && !_showSolution)
+        if (!_showSolution)
           BouncyButton(
-            // One more rewarded ad reveals the solution.
+            // Locked until the hint is used; then one rewarded ad reveals it.
             label: 'SOLUTION',
-            icon: Icons.play_circle_fill_rounded,
+            icon: _showHint
+                ? Icons.play_circle_fill_rounded
+                : Icons.lock_rounded,
             color: AppColors.accent,
             baseColor: AppColors.accentDark,
             height: 54,
@@ -415,6 +440,84 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
           ),
       ],
     );
+  }
+
+  /// The hint shown as an animated parchment scroll: two wooden rolls with a
+  /// parchment panel between them that unfurls into view. The text is the
+  /// puzzle's underlying logic (e.g. "Each number doubles.").
+  Widget _hintScroll(String logic) {
+    const parchment = Color(0xFFF6E8C8);
+    const parchmentEdge = Color(0xFFE7D2A4);
+    const roll = Color(0xFFB07D3F);
+    const rollDark = Color(0xFF6B4423);
+
+    Widget rollBar() => Container(
+      width: double.infinity,
+      height: 16,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [roll, rollDark],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            offset: const Offset(0, 2),
+            blurRadius: 3,
+          ),
+        ],
+      ),
+    );
+
+    return Container(
+          margin: const EdgeInsets.only(top: 16),
+          width: double.infinity,
+          child: Column(
+            children: [
+              rollBar(),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(22, 18, 22, 18),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [parchment, parchmentEdge],
+                  ),
+                  border: const Border.symmetric(
+                    vertical: BorderSide(color: rollDark, width: 2),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      '💡  The Logic',
+                      style: AppTheme.title(16, color: rollDark),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      logic,
+                      textAlign: TextAlign.center,
+                      style: AppTheme.title(20, color: AppColors.ink),
+                    ),
+                  ],
+                ),
+              ),
+              rollBar(),
+            ],
+          ),
+        )
+        .animate()
+        .fadeIn(duration: 250.ms)
+        .scaleXY(
+          begin: 0.85,
+          end: 1,
+          duration: 350.ms,
+          curve: Curves.easeOutBack,
+          alignment: Alignment.topCenter,
+        );
   }
 
   Widget _solvedCard(Level level, bool hasNext) {

@@ -1,9 +1,15 @@
+import 'dart:async';
+
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import 'ad_ids.dart';
 
 /// Loads and shows AdMob rewarded ads, keeping one preloaded so the next show
 /// is instant. Create one per screen, call [load] early, [dispose] when done.
+///
+/// [show] is async and resolves to whether the user earned the reward, which
+/// makes it easy to chain several ads back to back (e.g. 3 ads to unlock a
+/// hint) with a simple `await` loop.
 class RewardedAdService {
   RewardedAd? _ad;
   bool _loading = false;
@@ -31,35 +37,46 @@ class RewardedAdService {
     );
   }
 
-  /// Shows the preloaded ad. [onEarned] fires only if the user earns the
-  /// reward (watches enough of the ad). [onUnavailable] fires if no ad was
-  /// ready or it failed to show. A fresh ad is preloaded afterwards either way.
-  void show({
-    required void Function() onEarned,
-    void Function()? onUnavailable,
-  }) {
-    final ad = _ad;
-    if (ad == null) {
+  /// Ensures an ad is loaded (waiting briefly if needed), then shows it.
+  /// Resolves `true` only if the user earned the reward; `false` if no ad
+  /// could be shown or it was dismissed before completing. A fresh ad is
+  /// preloaded afterwards either way.
+  Future<bool> show() async {
+    if (_ad == null) {
       load();
-      onUnavailable?.call();
-      return;
+      if (!await _waitUntilReady()) return false;
     }
+    final ad = _ad;
+    if (ad == null) return false;
     _ad = null;
 
+    final completer = Completer<bool>();
     var earned = false;
     ad.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose();
         load();
-        if (earned) onEarned();
+        if (!completer.isCompleted) completer.complete(earned);
       },
       onAdFailedToShowFullScreenContent: (ad, _) {
         ad.dispose();
         load();
-        onUnavailable?.call();
+        if (!completer.isCompleted) completer.complete(false);
       },
     );
     ad.show(onUserEarnedReward: (ad, reward) => earned = true);
+    return completer.future;
+  }
+
+  /// Polls for up to ~10s for a load to finish. Returns whether an ad is ready.
+  Future<bool> _waitUntilReady() async {
+    const step = Duration(milliseconds: 250);
+    for (var i = 0; i < 40; i++) {
+      if (_ad != null) return true;
+      if (!_loading) return false; // load failed
+      await Future<void>.delayed(step);
+    }
+    return _ad != null;
   }
 
   void dispose() {

@@ -13,10 +13,8 @@ final appRouter = GoRouter(
   initialLocation: '/home',
   routes: [
     ShellRoute(
-      builder: (context, state, child) => _ShellScaffold(
-        location: state.uri.path,
-        child: child,
-      ),
+      builder: (context, state, child) =>
+          _ShellScaffold(location: state.uri.path, child: child),
       routes: [
         GoRoute(
           path: '/home',
@@ -102,8 +100,17 @@ class _ShellScaffoldState extends State<_ShellScaffold>
               ],
             ),
           ),
-          // Banner ad anchored right below the walking human navbar.
-          const SafeArea(top: false, child: BannerAdWidget()),
+          // Banner ad on a soil strip below the road, so the walking-human
+          // road clearly sits *above* the ad with no overlap.
+          Container(
+            width: double.infinity,
+            color: const Color(0xFF6B4423), // earth under the road
+            padding: const EdgeInsets.only(top: 8),
+            child: const SafeArea(
+              top: false,
+              child: Center(child: BannerAdWidget()),
+            ),
+          ),
         ],
       ),
     );

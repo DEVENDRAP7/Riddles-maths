@@ -21,11 +21,14 @@ class _WalkingNavBarState extends State<WalkingNavBar>
     with TickerProviderStateMixin {
   static const double _height = 150;
 
-  late final AnimationController _run =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 600))
-        ..repeat();
-  late final AnimationController _trans =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 1050));
+  late final AnimationController _run = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 600),
+  )..repeat();
+  late final AnimationController _trans = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1050),
+  );
 
   int _from = 0;
   int _to = 0;
@@ -57,9 +60,11 @@ class _WalkingNavBarState extends State<WalkingNavBar>
 
   @override
   Widget build(BuildContext context) {
-    final bottomPad = MediaQuery.of(context).padding.bottom;
+    // The navbar no longer sits over the system-nav inset (the banner ad +
+    // its SafeArea below it handles that), so it uses a fixed height. This
+    // keeps the road from bleeding down onto the banner.
     return SizedBox(
-      height: _height + bottomPad,
+      height: _height,
       child: LayoutBuilder(
         builder: (context, c) {
           final w = c.maxWidth;
@@ -75,11 +80,14 @@ class _WalkingNavBarState extends State<WalkingNavBar>
               final humanX = transitioning
                   ? _lerp(_boardCx(w, _from), _boardCx(w, _to), p)
                   : _boardCx(w, widget.index);
-              final bob = math.sin(_run.value * math.pi * 2 * 2).abs() *
+              final bob =
+                  math.sin(_run.value * math.pi * 2 * 2).abs() *
                   (transitioning ? 3 : 1.5);
               // Idle: faces the same way. Walking between boards: faces the
               // direction he is travelling (so going back home he turns around).
-              final facing = transitioning ? ((_to >= _from) ? 1.0 : -1.0) : 1.0;
+              final facing = transitioning
+                  ? ((_to >= _from) ? 1.0 : -1.0)
+                  : 1.0;
 
               return Stack(
                 clipBehavior: Clip.none,
@@ -96,10 +104,26 @@ class _WalkingNavBarState extends State<WalkingNavBar>
                       ),
                     ),
                   ),
-                  _board(w, 0, 'HOME', Icons.home_rounded, roadY, transitioning,
-                      humanX, bob),
-                  _board(w, 1, 'LEVELS', Icons.flag_rounded, roadY,
-                      transitioning, humanX, bob),
+                  _board(
+                    w,
+                    0,
+                    'HOME',
+                    Icons.home_rounded,
+                    roadY,
+                    transitioning,
+                    humanX,
+                    bob,
+                  ),
+                  _board(
+                    w,
+                    1,
+                    'LEVELS',
+                    Icons.flag_rounded,
+                    roadY,
+                    transitioning,
+                    humanX,
+                    bob,
+                  ),
                 ],
               );
             },
@@ -109,8 +133,16 @@ class _WalkingNavBarState extends State<WalkingNavBar>
     );
   }
 
-  Widget _board(double w, int i, String title, IconData icon, double roadY,
-      bool transitioning, double humanX, double bob) {
+  Widget _board(
+    double w,
+    int i,
+    String title,
+    IconData icon,
+    double roadY,
+    bool transitioning,
+    double humanX,
+    double bob,
+  ) {
     final carried = (i == widget.index) && !transitioning;
     const plankW = 104.0;
     const plankH = 34.0;
@@ -151,7 +183,11 @@ class _WalkingNavBarState extends State<WalkingNavBar>
                 gradient: const LinearGradient(
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
-                  colors: [Color(0xFF6B4423), Color(0xFF8A5A2B), Color(0xFF6B4423)],
+                  colors: [
+                    Color(0xFF6B4423),
+                    Color(0xFF8A5A2B),
+                    Color(0xFF6B4423),
+                  ],
                 ),
                 borderRadius: BorderRadius.circular(3),
               ),
@@ -163,8 +199,14 @@ class _WalkingNavBarState extends State<WalkingNavBar>
   }
 
   /// A chunky wooden plank: layered planks, grain lines, rounded ends.
-  Widget _woodPlank(String title, IconData icon, double wdt, double hgt,
-      bool active, {bool gripLeft = true}) {
+  Widget _woodPlank(
+    String title,
+    IconData icon,
+    double wdt,
+    double hgt,
+    bool active, {
+    bool gripLeft = true,
+  }) {
     return Container(
       width: wdt,
       height: hgt,
@@ -198,16 +240,13 @@ class _WalkingNavBarState extends State<WalkingNavBar>
               ),
             ),
             // Wood grain lines.
-            Positioned.fill(
-              child: CustomPaint(painter: _GrainPainter()),
-            ),
+            Positioned.fill(child: CustomPaint(painter: _GrainPainter())),
             // Plank split line.
             Positioned(
               left: 0,
               right: 0,
               top: hgt / 2 - 1,
-              child: Container(
-                  height: 1.5, color: const Color(0x556B4423)),
+              child: Container(height: 1.5, color: const Color(0x556B4423)),
             ),
             // Label.
             Padding(
@@ -218,8 +257,7 @@ class _WalkingNavBarState extends State<WalkingNavBar>
                   children: [
                     Icon(icon, size: 15, color: Colors.white),
                     const SizedBox(width: 5),
-                    Text(title,
-                        style: AppTheme.title(15, color: Colors.white)),
+                    Text(title, style: AppTheme.title(15, color: Colors.white)),
                   ],
                 ),
               ),
@@ -325,7 +363,12 @@ class _RoadRunnerPainter extends CustomPainter {
 
     // --- Body capsule ---
     final bodyRect = RRect.fromLTRBR(
-        -5, shoulder.dy, 5, hip.dy + 2, const Radius.circular(5));
+      -5,
+      shoulder.dy,
+      5,
+      hip.dy + 2,
+      const Radius.circular(5),
+    );
     canvas.drawRRect(bodyRect, Paint()..color = AppColors.accent);
 
     // --- Arms ---
@@ -343,12 +386,13 @@ class _RoadRunnerPainter extends CustomPainter {
     canvas.drawLine(shoulder, head + const Offset(0, 7), limb..strokeWidth = 5);
     canvas.drawCircle(head, 10, Paint()..color = AppColors.sunYellow);
     canvas.drawCircle(
-        head,
-        10,
-        Paint()
-          ..color = AppColors.accentDark
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 3);
+      head,
+      10,
+      Paint()
+        ..color = AppColors.accentDark
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3,
+    );
     // eyes + smile (faces forward, +x)
     final face = Paint()..color = AppColors.ink;
     canvas.drawCircle(head + const Offset(3, -2), 1.5, face);
@@ -357,12 +401,13 @@ class _RoadRunnerPainter extends CustomPainter {
       ..moveTo(head.dx + 2, head.dy + 3)
       ..quadraticBezierTo(head.dx + 5, head.dy + 6, head.dx + 8, head.dy + 3);
     canvas.drawPath(
-        smile,
-        Paint()
-          ..color = AppColors.ink
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.6
-          ..strokeCap = StrokeCap.round);
+      smile,
+      Paint()
+        ..color = AppColors.ink
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.6
+        ..strokeCap = StrokeCap.round,
+    );
 
     canvas.restore();
   }
@@ -375,9 +420,9 @@ class _RoadRunnerPainter extends CustomPainter {
     canvas.drawLine(knee, foot, p);
     // little shoe
     canvas.drawOval(
-        Rect.fromCenter(
-            center: foot + const Offset(2, 1), width: 10, height: 5),
-        shoe);
+      Rect.fromCenter(center: foot + const Offset(2, 1), width: 10, height: 5),
+      shoe,
+    );
   }
 
   void _arm(Canvas canvas, Offset shoulder, double angle, Paint p) {
@@ -394,12 +439,13 @@ class _RoadRunnerPainter extends CustomPainter {
     // Visible hand gripping under the board.
     canvas.drawCircle(hand, 3, Paint()..color = AppColors.sunYellow);
     canvas.drawCircle(
-        hand,
-        3,
-        Paint()
-          ..color = AppColors.accentDark
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.5);
+      hand,
+      3,
+      Paint()
+        ..color = AppColors.accentDark
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
   }
 
   Offset _polar(double angle, double len) =>
